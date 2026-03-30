@@ -291,7 +291,7 @@ def main():
         return 1
 
     client = Client()
-    project_name = os.getenv("LANGCHAIN_PROJECT", "prompt-optimization-challenge-resolved")
+    project_name = os.getenv("LANGSMITH_PROJECT", "prompt-optimization-challenge-resolved")
 
     jsonl_path = "datasets/bug_to_user_story.jsonl"
 
@@ -310,8 +310,9 @@ def main():
     print("Certifique-se de ter feito push dos prompts antes de avaliar:")
     print("  python src/push_prompts.py\n")
 
+    username = os.getenv("USERNAME_LANGSMITH_HUB", "darkned")
     prompts_to_evaluate = [
-        "bug_to_user_story_v2",
+        f"{username}/bug_to_user_story_v2",
     ]
 
     all_passed = True

@@ -321,3 +321,176 @@ python src/evaluate.py
 - **Não altere os datasets de avaliação** - apenas os prompts em `prompts/bug_to_user_story_v2.yml`
 - **Itere, itere, itere** - é normal precisar de 3-5 iterações para atingir 0.9 em todas as métricas
 - **Documente seu processo** - a jornada de otimização é tão importante quanto o resultado final
+
+---
+
+## Tecnicas Aplicadas (Fase 2)
+
+### 1. Role Prompting
+
+Defini a persona de um Product Manager Senior e Tech Lead com experiencia em metodologias ageis. O prompt v1 era generico ("assistente que ajuda a transformar bugs"), o que gerava user stories sem tom profissional e sem foco em valor de negocio. Com a persona, o modelo adota vocabulario e estrutura de quem realmente escreve user stories no dia a dia.
+
+**Exemplo pratico:**
+```
+# v1 (generico)
+"Voce e um assistente que ajuda a transformar relatos de bugs"
+
+# v2 (com Role Prompting)
+"Voce e um Product Manager Senior e Tech Lead com 10 anos de experiencia em metodologias ageis"
+```
+
+### 2. Few-shot Learning
+
+Adicionei 4 exemplos concretos de entrada/saida no system prompt, calibrados no padrao exato das referencias do dataset:
+
+- **Exemplo 1** - Bug simples: formato flat (user story + criterios)
+- **Exemplo 2** - Bug de estoque: formato flat com sub-secao "Criterios de Prevencao" e "Contexto do Bug"
+- **Exemplo 3** - Bug de UI/acessibilidade: formato flat com "Criterios de Acessibilidade" e "Contexto Tecnico"
+- **Exemplo 4** - Bug complexo (multiplos problemas): formato com secoes `===`, criterios tecnicos com SQL, tasks por fase e metricas de sucesso
+
+Escolhi essa tecnica porque as metricas avaliam formato especifico (Given-When-Then, sub-secoes nomeadas) e sem exemplos o modelo inventava formatos proprios.
+
+### 3. Chain of Thought (CoT)
+
+Inclui passos de raciocinio que o modelo segue internamente antes de gerar a resposta:
+
+1. Identificar todos os problemas do bug
+2. Determinar tipo especifico de usuario afetado
+3. Avaliar impacto no usuario e no negocio
+4. Classificar complexidade (simples/medio/complexo)
+5. Aplicar formato de saida correspondente
+
+Essa tecnica foi essencial para bugs complexos com multiplos problemas, onde o modelo precisa organizar a analise antes de escrever. Tambem evita que bugs simples sejam over-engineered com secoes desnecessarias.
+
+---
+
+## Resultados Finais
+
+### Links publicos
+
+- [Dashboard do projeto no LangSmith](https://smith.langchain.com/o/321c6872-cb35-4663-8af4-d1c2c7597cb4/dashboards/projects/80267151-8262-46a8-9586-a00d75e0f43c)
+- [Prompt v2 otimizado no LangSmith Hub](https://smith.langchain.com/hub/darkned/bug_to_user_story_v2)
+
+### Screenshots
+
+![Resultado da avaliacao no terminal](screenshots/resultado_print.png)
+
+![Dashboard LangSmith](screenshots/resultado_lang.png)
+
+### Resultados da avaliacao final
+
+| Metrica | Score | Status |
+|---------|-------|--------|
+| Helpfulness | 0.91 | Aprovado |
+| Correctness | 0.90 | Aprovado |
+| F1-Score | 0.88 | - |
+| Clarity | 0.89 | - |
+| Precision | 0.92 | Aprovado |
+| **Media Geral** | **0.9015** | **Aprovado** |
+
+### Tabela comparativa: v1 vs v2
+
+| Aspecto | v1 (original) | v2 (otimizado) |
+|---------|---------------|----------------|
+| Persona | Generica ("assistente") | Product Manager Senior + Tech Lead |
+| Formato de saida | Livre, inconsistente | Estruturado com Given-When-Then |
+| Exemplos (Few-shot) | Nenhum | 4 exemplos (simples, medio, acessibilidade, complexo) |
+| Classificacao de complexidade | Nenhuma | Binaria: Formato A (flat) vs Formato B (multi-problema) |
+| Sub-secoes | Nenhuma | Criterios Tecnicos, Prevencao, Acessibilidade conforme tipo |
+| Regras de especificidade | Nenhuma | HTTP codes exatos, OWASP, breakdown numerico, RecyclerView |
+| Regras de concisao | Nenhuma | Targets ambiciosos, anti-over-engineering |
+| Helpfulness | 0.89 | **0.91** |
+| Correctness | 0.83 | **0.90** |
+| F1-Score | 0.78 | **0.88** |
+| Clarity | 0.91 | 0.89 |
+| Precision | 0.88 | **0.92** |
+| **Media Geral** | **0.8552** | **0.9015** |
+
+### Detalhamento por exemplo
+
+| Exemplo | F1 | Clarity | Precision |
+|---------|-----|---------|-----------|
+| 1 - Sync offline (complexo) | 0.87 | 0.85 | 0.90 |
+| 2 - Relatorios (complexo) | 0.87 | 0.90 | 0.90 |
+| 3 - Checkout (complexo) | 0.87 | 0.90 | 1.00 |
+| 4 - Modal z-index (medio) | 0.85 | 0.95 | 0.90 |
+| 5 - Estoque (medio) | 0.87 | 0.90 | 0.90 |
+| 6 - Android notificacoes (medio) | 1.00 | 0.90 | 1.00 |
+| 7 - Pipeline vendas (medio) | 0.90 | 0.90 | 0.93 |
+| 8 - API permissoes (medio) | 0.90 | 0.90 | 1.00 |
+| 9 - Relatorio vendas (medio) | 0.90 | 0.90 | 0.90 |
+| 10 - Webhook (medio) | 0.80 | 0.80 | 0.80 |
+
+### Processo de iteracao
+
+Foram realizadas ~8 iteracoes ate atingir a meta de 0.9:
+
+1. **Prompt basico** (~0.50) - Sem tecnicas, formato livre
+2. **Role + Few-shot + CoT** (~0.82) - Primeira versao estruturada
+3. **Formato por complexidade** (~0.85) - Separacao simples/medio/complexo
+4. **Formato binario** (~0.89) - Simplificacao para Formato A (flat) vs Formato B (===)
+5. **Regras de especificidade** (~0.89) - HTTP codes, OWASP, breakdown numerico
+6. **Regras de concisao** (~0.89) - Targets ambiciosos, anti-over-engineering
+7. **Ajuste fino estoque/webhook** (~0.90) - Regras cirurgicas para os 2 piores exemplos
+8. **Aprovado com 0.9015**
+
+---
+
+## Evidencias no LangSmith
+
+- **Dashboard**: [Link publico do projeto](https://smith.langchain.com/o/321c6872-cb35-4663-8af4-d1c2c7597cb4/dashboards/projects/80267151-8262-46a8-9586-a00d75e0f43c)
+- **Dataset**: `mba-darkned-eval` com 15 exemplos (5 simples, 7 medios, 3 complexos)
+- **Prompt v1**: `leonanluppi/bug_to_user_story_v1` (prompt original de baixa qualidade)
+- **Prompt v2**: `darkned/bug_to_user_story_v2` (prompt otimizado, publico)
+- **Modelo principal**: gpt-5.4-mini
+- **Modelo de avaliacao**: gpt-4o
+
+---
+
+## Como Executar
+
+### Pre-requisitos
+
+- Python 3.9+
+- Conta no [LangSmith](https://smith.langchain.com/) com API key
+- API key da [OpenAI](https://platform.openai.com/api-keys) ou [Google AI](https://aistudio.google.com/app/apikey)
+
+### Instalacao
+
+```bash
+# 1. Clonar o repositorio
+git clone https://github.com/seu-usuario/mba-ia-pull-evaluation-prompt.git
+cd mba-ia-pull-evaluation-prompt
+
+# 2. Criar e ativar ambiente virtual
+python3 -m venv .venv
+source .venv/bin/activate  # No Windows: .venv\Scripts\activate
+
+# 3. Instalar dependencias
+pip install -r requirements.txt
+
+# 4. Configurar credenciais
+cp .env.example .env
+# Editar .env com suas chaves:
+# - LANGSMITH_API_KEY
+# - USERNAME_LANGSMITH_HUB (seu handle no LangSmith Hub)
+# - OPENAI_API_KEY ou GOOGLE_API_KEY
+# - LLM_PROVIDER (openai ou google)
+# - LLM_MODEL e EVAL_MODEL
+```
+
+### Execucao
+
+```bash
+# 1. Pull do prompt original (v1)
+python src/pull_prompts.py
+
+# 2. Push do prompt otimizado (v2) para o LangSmith Hub
+python src/push_prompts.py
+
+# 3. Executar avaliacao
+python src/evaluate.py
+
+# 4. Rodar testes de validacao
+pytest tests/test_prompts.py -v
+```
